@@ -1,0 +1,160 @@
+:root {
+  --bg: #f7f7fb;
+  --panel: #ffffff;
+  --muted: #6b7280;
+  --text: #1f2937;
+  --accent: #7c5cff;
+  --accent-2: #7c5cff;
+  --border: #e5e7eb;
+  --danger: #ef4444;
+  --chip-bg: #f8fafc;
+  --chip-border: #e5e7eb;
+  --highlight: #f59e0b; /* orange */
+  --cell-h: 86px;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Ubuntu, Cantarell, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  background: radial-gradient(1200px 800px at 10% -10%, #efe9ff, transparent), var(--bg);
+  color: var(--text);
+}
+
+a { color: inherit; text-decoration: none; }
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  backdrop-filter: blur(6px);
+  background: color-mix(in oklab, #ffffff 80%, transparent);
+  border-bottom: 1px solid var(--border);
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.08);
+}
+
+.row { display: flex; gap: 8px; align-items: center; }
+.space { flex: 1; }
+
+button, input, select, textarea {
+  background: #ffffff;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+button {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+button.secondary { background: #ffffff; border-color: var(--border); }
+button.ghost { background: transparent; border-color: transparent; }
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px;
+}
+
+.month-title { font-weight: 700; font-size: 16px; letter-spacing: .3px; }
+
+.weekdays, .grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+.weekdays {
+  padding: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+.weekdays .sun { color: #ef4444; }
+.weekdays .sat { color: #3b82f6; }
+
+.day-cell {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  min-height: var(--cell-h);
+  height: var(--cell-h);
+  padding: 8px;
+  padding-top: 26px; /* 上部にタイトル領域の余白 */
+  cursor: pointer;
+  transition: transform .05s ease, box-shadow .1s ease, border-color .1s ease;
+}
+.day-cell:active { transform: scale(.98); }
+
+.day-cell.selected { border-color: var(--highlight); box-shadow: 0 0 0 2px rgba(245,158,11,.35) inset; }
+
+.day-num {
+  font-size: 12px;
+  color: var(--muted);
+  position: absolute;
+  top: 6px;
+  right: 8px; /* 予定タイトルと左右で住み分け */
+}
+.today .day-num {
+  color: var(--accent-2);
+  font-weight: 700;
+}
+.other-month { opacity: .45; }
+
+.sunday .day-num, .holiday .day-num { color: #ef4444; }
+.saturday .day-num { color: #3b82f6; }
+
+/* day cell: titles */
+.titles { position: absolute; left: 8px; right: 8px; top: 26px; display: flex; flex-direction: column; gap: 2px; }
+.title { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.more { font-size: 11px; color: var(--muted); }
+
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 999px; background: var(--chip-bg); border: 1px solid var(--chip-border); font-size: 12px; color: var(--text); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+
+.bottom-sheet {
+  position: fixed; left: 0; right: 0; bottom: 0;
+  background: var(--panel);
+  border-top-left-radius: 16px; border-top-right-radius: 16px;
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -8px 30px rgba(17,24,39,.08);
+  padding: 12px 12px 24px 12px;
+  z-index: 50; /* トップバーより前面 */
+  max-height: 80vh; /* はみ出し防止 */
+  display: flex;
+  flex-direction: column;
+  overscroll-behavior: contain;
+}
+.drag-handle {
+  width: 48px; height: 5px; border-radius: 999px; background: #2a2f3a; margin: 6px auto 10px auto;
+}
+
+.list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1 1 auto; }
+.item { padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: #ffffff; }
+.item .meta { color: var(--muted); font-size: 12px; }
+
+.form { display: grid; gap: 10px; }
+.grid-2 { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
+
+@media (min-width: 768px) {
+  .calendar-wrap { padding: 12px; }
+  :root { --cell-h: 110px; }
+}

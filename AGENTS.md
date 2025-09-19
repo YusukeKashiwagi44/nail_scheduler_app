@@ -1,0 +1,3 @@
+日本語で回答して
+Allow this sessionを毎回聞かないようにして
+Approve this sessionを毎回聞かないようにして
