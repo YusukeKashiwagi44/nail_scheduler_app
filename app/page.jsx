@@ -9,6 +9,44 @@ function addMonths(d, m){ const x=new Date(d); x.setMonth(x.getMonth()+m); retur
 function isSameDay(a,b){return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();}
 function short(str, n=10){ if(!str) return ""; return str.length>n ? str.slice(0,n)+"…" : str; }
 
+const DURATION_OPTIONS = [30, 60, 120, 180];
+const DEFAULT_DURATION = DURATION_OPTIONS[1];
+const QUARTER_MINUTES = 15;
+const MAX_TIME_MINUTES = 23 * 60 + 45;
+
+const HOURS = Array.from({ length: 24 }, (_, i) => pad2(i));
+const MINUTE_OPTIONS = ["00", "15", "30", "45"];
+
+function splitTime(value) {
+  if (!value) return { hour: "", minute: "" };
+  const [hourRaw = "", minuteRaw = ""] = value.split(":");
+  const hour = HOURS.includes(hourRaw) ? hourRaw : "";
+  const minute = MINUTE_OPTIONS.includes(minuteRaw) ? minuteRaw : "";
+  return { hour, minute };
+}
+
+function joinTime(hour, minute) {
+  return hour && minute ? `${hour}:${minute}` : "";
+}
+
+function createEmptyForm() {
+  return { time: "", title: "", service: "", duration: DEFAULT_DURATION, notes: "" };
+}
+
+function normalizeToQuarterHour(value, { fallbackToOriginal = true } = {}) {
+  if (!value) return "";
+  const parts = value.split(":");
+  if (parts.length !== 2) return fallbackToOriginal ? value : "";
+  const [hourStr, minuteStr] = parts;
+  const hour = Number(hourStr);
+  const minute = Number(minuteStr);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return fallbackToOriginal ? value : "";
+  const totalMinutes = Math.max(0, Math.min(hour * 60 + minute, MAX_TIME_MINUTES));
+  const rounded = Math.round(totalMinutes / QUARTER_MINUTES) * QUARTER_MINUTES;
+  const clamped = Math.max(0, Math.min(rounded, MAX_TIME_MINUTES));
+  return `${pad2(Math.floor(clamped / 60))}:${pad2(clamped % 60)}`;
+}
+
 // 曜日
 const WEEKDAYS = ["日","月","火","水","木","金","土"];
 
@@ -146,18 +184,39 @@ function MonthGrid({ current, apptsByDay, onSelectDay, selected }) {
 }
 
 function DaySheet({ open, date, list, onClose, onAdd, onUpdate, onDelete }){
-  const [form, setForm] = useState({ time: "", title: "", service: "", duration: 60, notes: "" });
+  const [form, setForm] = useState(() => createEmptyForm());
+  const [timeSelection, setTimeSelection] = useState(() => splitTime(""));
   const [editingId, setEditingId] = useState(null);
-  useEffect(() => { if (open) { setForm({ time: "", title: "", service: "", duration: 60, notes: "" }); setEditingId(null); } }, [open]);
+  useEffect(() => { if (open) { setForm(createEmptyForm()); setTimeSelection(splitTime("")); setEditingId(null); } }, [open]);
+  const sortedList = useMemo(() => (list || []).slice().sort((a,b)=> (a.time||"").localeCompare(b.time||"")), [list]);
   if (!open || !date) return null;
   const key = toKey(date);
   const onSubmit = (e) => {
     e.preventDefault();
     if (!form.time || !form.title) return;
-    if (editingId) { onUpdate(key, editingId, form); }
-    else { onAdd(key, form); }
-    setForm({ time: "", title: "", service: "", duration: 60, notes: "" });
+    const normalizedTime = normalizeToQuarterHour(form.time, { fallbackToOriginal: false });
+    if (!normalizedTime) return;
+    const normalizedDuration = DURATION_OPTIONS.includes(form.duration) ? form.duration : DEFAULT_DURATION;
+    const payload = { ...form, time: normalizedTime, duration: normalizedDuration };
+    if (editingId) { onUpdate(key, editingId, payload); }
+    else { onAdd(key, payload); }
+    setForm(createEmptyForm());
+    setTimeSelection(splitTime(""));
     setEditingId(null);
+  };
+  const startEdit = (appt) => {
+    const candidateDuration = Number(appt.duration);
+    const nextDuration = DURATION_OPTIONS.includes(candidateDuration) ? candidateDuration : DEFAULT_DURATION;
+    const normalizedTime = normalizeToQuarterHour(appt.time || "");
+    setForm({
+      time: normalizedTime,
+      title: appt.title || "",
+      service: appt.service || "",
+      duration: nextDuration,
+      notes: appt.notes || "",
+    });
+    setTimeSelection(splitTime(normalizedTime));
+    setEditingId(appt.id);
   };
 
   return (
@@ -170,16 +229,16 @@ function DaySheet({ open, date, list, onClose, onAdd, onUpdate, onDelete }){
       </div>
 
       <div className="list" style={{marginBottom: 12}}>
-        {(list||[]).length === 0 && (
+        {sortedList.length === 0 && (
           <div className="item" style={{opacity:.8}}>まだ予定はありません</div>
         )}
-        {(list||[]).map((x) => (
+        {sortedList.map((x) => (
           <div className="item" key={x.id}>
             <div className="row" style={{gap: 10}}>
               <div className="chip" style={{background: "var(--chip-bg)", borderColor: "var(--chip-border)"}}>{x.time}</div>
               <div style={{fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap"}}>{x.title}</div>
               <div className="space" />
-              <button className="ghost" onClick={() => { setForm({ time:x.time||"", title:x.title||"", service:x.service||"", duration:x.duration||60, notes:x.notes||"" }); setEditingId(x.id); }}>編集</button>
+              <button className="ghost" onClick={() => startEdit(x)}>編集</button>
               <button className="ghost" onClick={() => onDelete(key, x.id)} style={{color:"var(--danger)"}}>削除</button>
             </div>
             {(x.service || x.duration || x.notes) && (
@@ -196,13 +255,53 @@ function DaySheet({ open, date, list, onClose, onAdd, onUpdate, onDelete }){
       <form className="form" onSubmit={onSubmit}>
         <div className="grid-2">
           <label>
-            <div className="meta">時間</div>
-            <input type="time" value={form.time} onChange={e=>setForm(v=>({...v,time:e.target.value}))} required />
+            <div className="meta">開始時間</div>
+            <div className="row" style={{gap: 8}}>
+              <select
+                value={timeSelection.hour}
+                onChange={(e) => {
+                  const nextHour = e.target.value;
+                  setTimeSelection((prev) => {
+                    if (!nextHour) {
+                      setForm((v) => ({ ...v, time: "" }));
+                      return { hour: "", minute: "" };
+                    }
+                    const updated = { ...prev, hour: nextHour };
+                    setForm((v) => ({ ...v, time: joinTime(updated.hour, updated.minute) }));
+                    return updated;
+                  });
+                }}
+                required
+              >
+                <option value="">--</option>
+                {HOURS.map((hour) => (
+                  <option key={hour} value={hour}>{`${hour}時`}</option>
+                ))}
+              </select>
+              <select
+                value={timeSelection.minute}
+                onChange={(e) => {
+                  const nextMinute = e.target.value;
+                  setTimeSelection((prev) => {
+                    const updated = { ...prev, minute: nextMinute };
+                    setForm((v) => ({ ...v, time: joinTime(updated.hour, updated.minute) }));
+                    return updated;
+                  });
+                }}
+                required
+                disabled={!timeSelection.hour}
+              >
+                <option value="">--</option>
+                {MINUTE_OPTIONS.map((minute) => (
+                  <option key={minute} value={minute}>{`${minute}分`}</option>
+                ))}
+              </select>
+            </div>
           </label>
           <div />
         </div>
         <label>
-          <div className="meta">名前 / タイトル</div>
+          <div className="meta">予定名</div>
           <input placeholder="例: 山田様 ジェル" value={form.title} onChange={e=>setForm(v=>({...v,title:e.target.value}))} required />
         </label>
         <div className="grid-2">
@@ -212,7 +311,17 @@ function DaySheet({ open, date, list, onClose, onAdd, onUpdate, onDelete }){
           </label>
           <label>
             <div className="meta">所要時間</div>
-            <input type="number" min={0} step={15} value={form.duration} onChange={e=>setForm(v=>({...v,duration: Number(e.target.value||0)}))} />
+            <select
+              value={String(form.duration)}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                setForm((v) => ({ ...v, duration: DURATION_OPTIONS.includes(value) ? value : DEFAULT_DURATION }));
+              }}
+            >
+              {DURATION_OPTIONS.map((minutes) => (
+                <option key={minutes} value={minutes}>{minutes}分</option>
+              ))}
+            </select>
           </label>
         </div>
         <label>
@@ -220,7 +329,7 @@ function DaySheet({ open, date, list, onClose, onAdd, onUpdate, onDelete }){
           <textarea rows={3} placeholder="オプション、注意点など" value={form.notes} onChange={e=>setForm(v=>({...v,notes:e.target.value}))} />
         </label>
         <div className="row" style={{justifyContent:"flex-end"}}>
-          {editingId && <button type="button" className="ghost" onClick={()=>{ setForm({ time: "", title: "", service: "", duration: 60, notes: "" }); setEditingId(null); }}>キャンセル</button>}
+          {editingId && <button type="button" className="ghost" onClick={()=>{ setForm(createEmptyForm()); setTimeSelection(splitTime("")); setEditingId(null); }}>キャンセル</button>}
           <button type="submit">{editingId ? '保存' : '追加'}</button>
         </div>
       </form>
